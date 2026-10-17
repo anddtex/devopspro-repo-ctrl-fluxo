@@ -252,3 +252,215 @@ ${{ inputs.exemplo_input }}
 ## 📖 Referência
 
 Documentação estruturada a partir da transcrição fornecida da aula sobre **Workflow Dispatch**, preservando os conceitos e exemplos apresentados.
+
+# GitHub Actions — Evento `push`
+
+## Objetivo
+
+O evento `push` dispara um workflow do GitHub Actions quando alterações são enviadas ao repositório. Ele pode ser configurado para executar em qualquer branch ou apenas em branches, tags e caminhos específicos.
+
+## 1. Configuração básica
+
+Para executar o workflow a cada `push`, independentemente da branch:
+
+```yaml
+name: Action Teste
+
+on:
+  push:
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exibir mensagem
+        run: echo "Workflow executado por push"
+```
+
+Com essa configuração, um envio de código para qualquer branch pode disparar o workflow.
+
+## 2. Restringindo por branch
+
+Use `branches` para definir quais branches podem disparar a automação:
+
+```yaml
+name: Action Teste
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exibir mensagem
+        run: echo "Action executada apenas em main e features"
+```
+
+Nesse exemplo, o workflow é executado em pushes para `main` e para branches que correspondam ao padrão `feature/**`, como `feature/nova-feature`.
+
+É possível declarar vários padrões de branch. Para excluir padrões específicos, existe também `branches-ignore`; não use `branches` e `branches-ignore` juntos no mesmo evento. Escolha a forma que melhor representa a regra desejada.
+
+### Exemplos de padrões
+
+| Padrão | Finalidade |
+|---|---|
+| `main` | Somente a branch `main` |
+| `feature/**` | Branches sob o padrão `feature/` |
+| `release/**` | Branches sob o padrão `release/` |
+| `hotfix/**` | Branches sob o padrão `hotfix/` |
+
+**Atenção:** se o workflow estiver limitado a `main` e `feature/**`, um push para `hotfix/correcao` não o disparará.
+
+## 3. A definição do workflow na branch atual
+
+O GitHub Actions considera a versão do arquivo de workflow presente na branch relacionada ao evento. Por isso, se o arquivo YAML for alterado apenas em uma branch de feature, essa alteração não passa automaticamente a valer para a versão do workflow que está na `main`.
+
+Ao testar workflows em branches diferentes, confira:
+- em qual branch o commit foi feito;
+- qual versão do arquivo YAML existe nessa branch;
+- quais regras de `push` estão configuradas nessa versão.
+
+## 4. Disparando por tags
+
+Também é possível restringir o evento a tags, por exemplo, tags de versão que começam com `v`:
+
+```yaml
+name: Workflow por tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mostrar versão
+        run: echo "Workflow disparado por uma tag de versão"
+```
+
+Para criar e enviar uma tag local:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Para enviar todas as tags locais de uma vez:
+
+```bash
+git push origin --tags
+```
+
+A regra `tags` filtra os nomes das tags. Quando o evento `push` especifica filtros de tags, ele é disparado conforme essas regras; a configuração deve refletir se o objetivo é executar por branches ou por tags.
+
+## 5. Filtrando por arquivos e diretórios (`paths`)
+
+Em repositórios que contêm vários projetos ou subdiretórios, talvez não seja necessário executar uma pipeline para qualquer alteração. O filtro `paths` permite executar o workflow apenas quando os arquivos alterados corresponderem aos caminhos definidos.
+
+Exemplo: executar somente quando houver mudanças no código dentro de `src/`:
+
+```yaml
+name: Pipeline do código
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar alteração no código
+        run: echo "O diretório src foi alterado"
+```
+
+Com essa configuração, alterações apenas no `README.md`, fora de `src/`, não atendem ao filtro de caminhos.
+
+## 6. Ignorando caminhos (`paths-ignore`)
+
+Use `paths-ignore` quando o workflow deve executar para alterações em geral, mas não deve executar se **todos** os arquivos modificados corresponderem aos caminhos ignorados.
+
+Exemplo:
+
+```yaml
+name: Pipeline do código
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executar pipeline
+        run: echo "Executando pipeline para alterações relevantes"
+```
+
+Nesse exemplo, uma alteração apenas em `docs/` ou `README.md` não dispara o workflow. Se houver alterações também em arquivos fora desses caminhos, o workflow poderá ser executado.
+
+**Importante:** não configure `paths` e `paths-ignore` juntos para o mesmo evento `push`. Use `paths` para uma lista positiva de caminhos ou `paths-ignore` para excluir caminhos.
+
+## 7. Combinando filtros de branch e caminho
+
+É possível combinar filtros de branch e caminho. O workflow só será executado quando os critérios configurados forem atendidos.
+
+```yaml
+name: Pipeline do serviço
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+    paths:
+      - 'src/**'
+      - 'services/**'
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executar validação
+        run: echo "Branch permitida e caminho relevante alterado"
+```
+
+Esse padrão é útil em monorepos, nos quais cada projeto pode ter sua própria pipeline. Assim, uma alteração em um serviço não precisa disparar automações de componentes sem relação com ele.
+
+## 8. Boas práticas
+
+- **Restrinja por branch** quando a pipeline só fizer sentido em branches específicas.
+- **Use tags para versões e releases** quando o processo de publicação depender de uma tag.
+- **Use `paths`** para executar tarefas apenas quando arquivos relevantes mudarem.
+- **Use `paths-ignore`** para evitar execuções causadas somente por documentação ou arquivos secundários.
+- **Teste as regras** em branches e commits separados, observando a aba **Actions** do repositório.
+- **Mantenha os filtros simples e claros**, para facilitar a manutenção do workflow.
+- **Separe automações por finalidade** quando validação de código, documentação, publicação e deploy tiverem gatilhos diferentes.
+
+## 9. Checklist de validação
+
+- [ ] O workflow está no diretório `.github/workflows/`.
+- [ ] O evento está declarado como `on: push`.
+- [ ] Os filtros de branch correspondem às branches esperadas.
+- [ ] Os filtros de tags correspondem ao padrão de versionamento adotado.
+- [ ] Os caminhos em `paths` ou `paths-ignore` correspondem à estrutura real do repositório.
+- [ ] Foi testado um push que deve disparar o workflow.
+- [ ] Foi testado um push que não deve dispará-lo.
+- [ ] A versão do arquivo YAML na branch testada contém a configuração esperada.
+
+## Resumo
+
+O evento `push` é um dos principais gatilhos do GitHub Actions. Além de executar workflows quando código é enviado ao repositório, seus filtros permitem controlar a execução por **branch**, **tag** e **caminho de arquivo**. Configurar esses filtros adequadamente reduz execuções desnecessárias e ajuda a organizar pipelines em projetos com múltiplos componentes.

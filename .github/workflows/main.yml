@@ -1,17 +1,10 @@
 name: Workflow Evento
 on: 
-  workflow_dispatch:
-  # Inserindo INPUTS
-    inputs:
-      exemplo-input:
-        type: string
-        description: "Testes de INPUTS"
-        required: true
+  push:
+    branches: ["main", "feature/*"]
 jobs:
   teste:
     runs-on: ubuntu-22.04
     steps:
       - name: Action de Teste
-        run: echo "${{ inputs.exemplo-input }}"
-        # run: echo "Disparou o novo evento com inputs"
-        
+        run: echo "Action executada apenas em main  e features" 
