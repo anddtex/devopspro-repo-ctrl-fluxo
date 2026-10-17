@@ -1,0 +1,10 @@
+name: Workflow Evento
+on: 
+  workflow_dispatch:
+jobs:
+  teste:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Action de Teste
+        run: echo "Disparou o evento"
+        
