@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   # Inserindo INPUTS
     inputs:
-      exeplo-input:
+      exemplo-input:
         type: string
         description: "Testes de INPUTS"
         required: true
@@ -12,6 +12,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Action de Teste
-        # run: echo "Disparou o novo evento com inputs"
         run: echo "${{ inputs.exemplo-input }}"
+        # run: echo "Disparou o novo evento com inputs"
         
