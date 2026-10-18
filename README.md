@@ -464,3 +464,194 @@ Esse padrão é útil em monorepos, nos quais cada projeto pode ter sua própria
 ## Resumo
 
 O evento `push` é um dos principais gatilhos do GitHub Actions. Além de executar workflows quando código é enviado ao repositório, seus filtros permitem controlar a execução por **branch**, **tag** e **caminho de arquivo**. Configurar esses filtros adequadamente reduz execuções desnecessárias e ajuda a organizar pipelines em projetos com múltiplos componentes.
+
+# GitHub Actions — Evento `pull_request`
+
+## Objetivo
+
+O evento `pull_request` permite executar workflows quando um Pull Request (PR) é aberto, atualizado ou passa por determinadas ações. Ele é útil para automatizar verificações antes de incorporar alterações a uma branch de destino, como `main`.
+
+Entre as verificações que podem ser executadas estão:
+- testes automatizados;
+- análise estática e qualidade do código;
+- análise de vulnerabilidades;
+- validações de build;
+- comentários automáticos no Pull Request.
+
+## 1. Configuração básica
+
+```yaml
+name: Teste Pull Request
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Exibir mensagem
+        run: echo "Workflow disparado por um Pull Request direcionado à main"
+```
+
+O filtro `branches` refere-se à **branch de destino** do Pull Request, não ao nome da branch de origem.
+
+## 2. Como o fluxo funciona
+
+1. Criar uma branch de trabalho, por exemplo, `feature/teste`.
+2. Fazer alterações e enviar os commits para o repositório.
+3. Abrir um Pull Request com destino à `main`.
+4. O GitHub Actions executa os jobs definidos no workflow.
+5. A equipe consulta os resultados antes de concluir o merge.
+
+Se a automação identificar falhas, os resultados ficam visíveis no Pull Request. Para impedir merges com verificações reprovadas, configure as regras de proteção da branch e os checks obrigatórios nas configurações do repositório.
+
+## 3. Validando código antes do merge
+
+Uma pipeline de Pull Request pode executar testes, verificações de qualidade e ferramentas de segurança, como analisadores estáticos ou scanners de vulnerabilidade. Isso permite identificar problemas antes da revisão manual e reservar o Code Review humano para avaliar lógica, arquitetura, legibilidade e outros aspectos que exigem análise.
+
+> O workflow, por si só, não reprova automaticamente um Pull Request. Para bloquear o merge com base nos resultados, configure as regras de proteção da branch e marque os checks necessários como obrigatórios.
+
+## 4. Comentando automaticamente no Pull Request
+
+A action `actions/github-script` permite executar JavaScript que interage com a API do GitHub, como adicionar um comentário ao Pull Request.
+
+```yaml
+name: Comentário no Pull Request
+
+on:
+  pull_request:
+    types:
+      - opened
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  comentar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Adicionar comentário ao PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: 'Pull Request recebido. As verificações automatizadas serão executadas.'
+            });
+```
+
+O exemplo comenta quando o Pull Request é aberto. A permissão `issues: write` é necessária para criar comentários por meio desse endpoint. Conceda apenas as permissões necessárias ao workflow, evitando permissões amplas sem necessidade.
+
+Em repositórios que recebem contribuições externas, considere as restrições de segurança aplicáveis a workflows de Pull Request.
+
+## 5. Controlando os tipos de evento com `types`
+
+É possível limitar o workflow a tipos específicos de atividade. Por exemplo, executar quando o PR for aberto, atualizado com novos commits ou reaberto:
+
+```yaml
+name: Verificações do Pull Request
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar alteração
+        run: echo "Executando verificações do Pull Request"
+```
+
+Tipos comuns:
+
+| Tipo | Quando ocorre |
+|---|---|
+| `opened` | Quando o Pull Request é aberto |
+| `synchronize` | Quando a branch do Pull Request recebe novos commits |
+| `reopened` | Quando um Pull Request fechado é reaberto |
+| `closed` | Quando o Pull Request é fechado, com ou sem merge |
+
+Se `types` for omitido, o GitHub utiliza os tipos de atividade padrão do evento `pull_request`. Ao declarar `types`, o workflow responde aos tipos listados.
+
+## 6. Executando quando o Pull Request for fechado
+
+```yaml
+name: Ação após fechar PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+jobs:
+  apos-fechamento:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Informar fechamento
+        run: echo "O Pull Request foi fechado"
+```
+
+O evento `closed` ocorre quando o Pull Request é fechado, com ou sem merge. Se a ação deve ocorrer **somente quando houve merge**, verifique também `github.event.pull_request.merged`:
+
+```yaml
+jobs:
+  apos-merge:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Informar merge
+        run: echo "O Pull Request foi incorporado"
+```
+
+## 7. Entendendo a branch e o contexto do evento
+
+Para diagnosticar execuções, confira:
+- qual branch foi usada como origem;
+- qual branch foi escolhida como destino;
+- qual tipo de atividade ocorreu;
+- qual versão do arquivo de workflow está sendo utilizada;
+- se os filtros correspondem à ação realizada.
+
+Ao testar alterações no YAML, observe a branch na qual o arquivo foi alterado, pois a configuração efetivamente utilizada depende do contexto do evento e das regras do GitHub Actions.
+
+## 8. Boas práticas
+
+- Execute testes, análise estática e verificações de segurança antes do merge.
+- Configure checks obrigatórios nas regras de proteção da branch quando necessário.
+- Use `branches` para restringir Pull Requests pela branch de destino.
+- Use `types` para executar apenas nas atividades relevantes.
+- Declare permissões mínimas em `permissions`.
+- Evite permissões amplas sem necessidade, especialmente em workflows que recebem contribuições externas.
+- Separe verificações anteriores ao merge de automações posteriores ao fechamento ou merge.
+- Consulte a aba **Actions** e os checks do Pull Request para investigar falhas.
+
+## 9. Checklist de validação
+
+- [ ] O workflow está em `.github/workflows/`.
+- [ ] O evento `pull_request` está configurado.
+- [ ] O filtro `branches` aponta para a branch de destino correta.
+- [ ] Os tipos em `types` correspondem às atividades desejadas.
+- [ ] Testes e análises relevantes são executados.
+- [ ] Os checks obrigatórios estão configurados nas regras de proteção, se necessário.
+- [ ] As permissões concedidas são mínimas e suficientes.
+- [ ] Foram testados os cenários desejados de abertura, atualização e fechamento do Pull Request.
+
+## Resumo
+
+O evento `pull_request` permite automatizar validações durante o processo de revisão de código. Ele pode disparar testes, análises de qualidade e segurança ou scripts que interagem com o Pull Request. Com os filtros `branches` e `types`, permissões mínimas e regras de proteção da branch, é possível criar um fluxo de revisão mais consistente e reduzir o esforço manual da equipe.
