@@ -1,0 +1,13 @@
+name: Workflow Evento
+on: 
+  push:
+    branches: ["main", "features/*"]
+    # Apenas para diretorios especificos
+    paths:
+      - "src/**"
+jobs:
+  teste:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Action de Teste
+        run: echo "Action executada apenas em main  e features" 
