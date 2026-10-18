@@ -7,4 +7,14 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Action de Teste
-        run: echo "Action executada apenas em main  e features" 
+        
+      - name: Alteração no Card
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: contex.repo.owner,
+              repo: context.repo.repo,
+              body: 'Adicionando um comentario sobre a Pull Request'
+            })
