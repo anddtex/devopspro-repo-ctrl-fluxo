@@ -2,12 +2,15 @@ name: Workflow Evento
 on: 
   pull_request:
     branches: ["main"]
+    types: closed
+
 jobs:
   teste:
+    permissions: write-all
     runs-on: ubuntu-22.04
     steps:
       - name: Action de Teste
-        
+        run: echo "Actions exectuado para branch main"
       - name: Alteração no Card
         uses: actions/github-script@v6
         with:
