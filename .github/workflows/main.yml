@@ -2,6 +2,7 @@ name: Workflow Evento
 on: 
   pull_request:
     branches: ["main"]
+    types: closed
 
 jobs:
   teste:
